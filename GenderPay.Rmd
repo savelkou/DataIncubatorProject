@@ -1,0 +1,243 @@
+---
+title: "UK GENDER PAY GAP"
+author: "Sophie Savelkouls"
+date: '`r Sys.time()`'
+output:
+  pdf_document:
+    toc: yes
+  html_notebook:
+    code_folding: hide
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+---
+# Loading Library and Data
+
+```{r warning=FALSE, message = FALSE}
+#Loading packages
+library(psych)
+library(plyr)
+library(knitr)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ppcor)
+library("reshape2")
+
+#Setting working directory
+setwd("~/Documents/Rfiles/DataIncubator")
+
+#Reading in the data
+RawData<- read.csv(file="UK Gender Pay Gap Data.csv")
+
+#Sets how many decimal places I want and that it should avoid scientific notation
+options(digits = 3, scipen = 99)
+
+#Here I am removing unnecessary columns
+Data_FirstClean<- subset(RawData, select=-c(1,2,4,19, 20,22, 23))
+```
+
+#Graphs
+##Effect of Company Size on Gender Pay Gap
+```{r}
+Size_HourlyDiff <- subset(RawData, select=c(DiffMeanHourlyPercent, EmployerSize, CompanyNumber)) 
+
+##First creating graph so I can get a sense of what my data looks like
+
+graph <- ggplot(data=Size_HourlyDiff, aes(x=EmployerSize, y=DiffMeanHourlyPercent)) +
+  geom_boxplot() +
+  theme_grey() +
+  theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12), legend.position="right", legend.text = element_text(size = 10),legend.key.size = unit(1,"cm"), plot.title = element_text(size=12, hjust = 0.5)) +
+labs(x="Congruency",y="Percentage Correct")
+graph
+
+##Since there are so many outliers that are skewing the data I will now remove them
+
+#First I create a custom function that shows the outliers ranged above and below the 1.5*IQR (standard way fo calculating outliers).So any number that  that are 1.5·IQR of Q1 and Q3
+
+UpperOutlier <- function(x){
+  Q3 <- quantile(x, probs = .75)
+  Q1 <- quantile(x, probs = .25)
+  Outlier <- 1.5*(Q3 - Q1)
+  Q3 + Outlier
+}
+
+LowerOutlier <- function(x){
+  Q3 <- quantile(x, probs = .75)
+  Q1 <- quantile(x, probs = .25)
+  Outlier <- 1.5*(Q3 - Q1)
+  Q1 - Outlier
+}
+
+V1 <- aggregate(Size_HourlyDiff[, 1], list(Size_HourlyDiff$EmployerSize), UpperOutlier)
+V2 <- aggregate(Size_HourlyDiff[, 1], list(Size_HourlyDiff$EmployerSize), LowerOutlier)
+
+Outliers <- merge(V1, V2, by="Group.1")
+colnames(Outliers) <- c("Size", "Upper_Outlier","Lower_Outlier")
+
+##Creating subset for each employer size so I can eliminate rows based on outliers this way
+#size1
+variable1 <- "1000 to 4999"
+Size1 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size1_new<- Size1[which(Size1[,1]<U),]
+Size1_new<- Size1_new[which(Size1_new[,1]>L),]
+
+#size2
+variable1 <- "20,000 or more"
+Size2 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size2_new<- Size2[which(Size1[,1]<U),]
+Size2_new<- Size2_new[which(Size2_new[,1]>L),]
+
+#size3
+variable1 <- "250 to 499"
+Size3 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size3_new<- Size3[which(Size1[,1]<U),]
+Size3_new<- Size3_new[which(Size2_new[,1]>L),]
+
+
+#size4
+variable1 <- "500 to 999"
+Size4 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size4_new<- Size4[which(Size1[,1]<U),]
+Size4_new<- Size4_new[which(Size2_new[,1]>L),]
+
+#size5
+variable1 <- "5000 to 19,999"
+Size5 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size5_new<- Size5[which(Size1[,1]<U),]
+Size5_new<- Size5_new[which(Size2_new[,1]>L),]
+
+#size6
+variable1 <- "Less than 250"
+Size6 <- Size_HourlyDiff[Size_HourlyDiff$EmployerSize %in% variable1,]
+L <- Outliers[1,"Lower_Outlier"]
+U <- Outliers[1,"Upper_Outlier"]
+
+Size6_new<- Size6[which(Size1[,1]<U),]
+Size6_new<- Size6_new[which(Size2_new[,1]>L),]
+
+##I did not include data where we don't have information about Employer size
+Size_HourlyDiff_NO_OUTLIERS <- rbind(Size6_new, Size5_new, Size4_new, Size3_new, Size2_new, Size1_new)
+
+Size_HourlyDiff_NO_OUTLIERS$EmployerSize<-factor(Size_HourlyDiff_NO_OUTLIERS$EmployerSize, levels = c("Less than 250","250 to 499","500 to 999","1000 to 4999","5000 to 19,999","20,000 or more"))
+
+graph_Nooutilers <- ggplot(data=Size_HourlyDiff_NO_OUTLIERS, aes(x=EmployerSize, y=DiffMeanHourlyPercent)) +
+  geom_violin(fill = "seagreen3", colour = "seagreen3") +
+  theme_grey() +
+  theme(axis.text = element_text(size = 10,angle = 90), axis.title = element_text(size = 12), legend.position="right", legend.text = element_text(size = 10),legend.key.size = unit(1,"cm"), plot.title = element_text(size=12, hjust = 0.5)) +
+  ggtitle("Plot of Gender Pay Gap by Employer Size") +
+labs(x="Employer Size",y="Difference in Hourly Pay (Fem - Male)")
+graph_Nooutilers
+
+ggsave(filename = "Plot of Gender Pay Gap by Employer Size.pdf")
+
+```
+
+##For each quartile of pay, what is the distribution of males and females
+```{r}
+Data_Quartiles <- subset(x = Data_FirstClean, select=c(MaleLowerQuartile, FemaleLowerQuartile, MaleLowerMiddleQuartile, FemaleLowerMiddleQuartile, MaleUpperMiddleQuartile, FemaleUpperMiddleQuartile, MaleTopQuartile, FemaleTopQuartile)) 
+
+##matrix of means
+temp=c()
+for (i in names(Data_Quartiles)) { 
+    temp[i] <-colMeans(Data_Quartiles[i])
+}
+
+Data_Quartile_means <- matrix(c(temp),ncol=2,byrow=TRUE)
+Data_Quartile_means <- as_data_frame(Data_Quartile_means)
+Data_Quartile_means[,"Quartiles"]<- c("Low", "MiddleLow","UpperLow","Upper")
+colnames(Data_Quartile_means) <- c("Male","Female","Quartiles")
+
+Data_longform_means <- melt(Data_Quartile_means[c(1,2,3)],id.vars ="Quartiles", value.name="means", variable.name="Gender")
+
+
+##matrix of std errors
+Data_Quartiles<- as_data_frame(Data_Quartiles)
+temp2<- apply(Data_Quartiles, 2, sd)
+temp2 <- (temp2/nrow(Data_Quartiles))
+
+Data_Quartile_sde <- matrix(c(temp2),ncol=2,byrow=TRUE)
+Data_Quartile_sde <- as_data_frame(Data_Quartile_sde)
+Data_Quartile_sde[,"Quartiles"]<- c("Low", "MiddleLow","UpperLow","Upper")
+colnames(Data_Quartile_sde) <- c("Male","Female","Quartiles")
+
+Data_longform_sde <- melt(Data_Quartile_sde[c(1,2,3)], id.vars="Quartiles", value.name="sde", variable.name="Gender")
+
+#adding means and std errors together
+Data_longform_means[,"sde"] <- Data_longform_sde$sde
+
+Data_longform_means$means <- as.numeric(Data_longform_means$means)
+Data_longform_means$sde <- as.numeric(Data_longform_means$sde)
+Data_longform_means$Gender <- as.character(Data_longform_means$Gender)
+Data_longform_means$Quartiles <- as.character(Data_longform_means$Quartiles)
+
+##standard error is so small that error bars aren't even visible so I removed them but this is the code to add: geom_errorbar(aes(ymin=means-sde, ymax=means+sde), colour="black", width=.01)
+
+graph <- ggplot(data=Data_longform_means, aes(x=Quartiles, y=means, group = Gender, fill=Gender)) +
+  geom_bar(stat = "identity")+
+  scale_fill_manual(values=c("palevioletred1", "steelblue2")) +
+  theme_grey() +
+  theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12), legend.position="right", legend.text = element_text(size = 10),legend.key.size = unit(1,"cm"), plot.title = element_text(size=12, hjust = 0.5)) +
+labs(x="Pay bands",y="Percentage of Employees") +
+ggtitle("Proportion of males and females in each of four pay bands")
+graph
+
+ggsave(filename = "Plot of Gender distribution by pay band.pdf")
+```
+```{r}
+##I also want to see whether there are significant difference in pay based on the quartile and gender so will run an 2 (Gender) x 4 (Quartile) ANOVA 
+
+#First I needed to change data to longform
+Data_Quartiles$ID <- seq.int(nrow(Data_Quartiles))
+Data_Quartiles_Male <- subset(x = Data_Quartiles, select=c(ID, MaleLowerQuartile, MaleLowerMiddleQuartile, MaleUpperMiddleQuartile, MaleTopQuartile)) 
+colnames(Data_Quartiles_Male) <- c("ID", "Lower", "LowerMiddle", "UpperMiddle", "Top")
+
+Data_longform_ANOVA <- melt(Data_Quartiles_Male[c(1:5)],id.vars ="ID", value.name="Percentage", variable.name="Quartile")
+Data_longform_ANOVA$Gender <- 'Male'
+
+Data_Quartiles_Female <- subset(x = Data_Quartiles, select=c(ID, FemaleLowerQuartile, FemaleLowerMiddleQuartile, FemaleUpperMiddleQuartile, FemaleTopQuartile)) 
+colnames(Data_Quartiles_Female) <- c("ID", "Lower", "LowerMiddle", "UpperMiddle", "Top")
+
+Data_longform_temp <- melt(Data_Quartiles_Female[c(1:5)],id.vars ="ID", value.name="Percentage", variable.name="Quartile")
+Data_longform_temp$Gender <- 'Female'
+
+Data_longform_ANOVA <- rbind(Data_longform_ANOVA, Data_longform_temp)
+
+#Now run anova
+anova(lm(Percentage ~ Gender * Quartile, data = Data_longform_ANOVA))
+
+##Obviosuly no effect of quartiles because each quartiles adds up to 100% however, the interaction suggests that distribution of gender is different depending on quartile
+
+#Now run t-tests to see where there might be differences
+a <- t.test(Data_Quartiles$MaleLowerQuartile,Data_Quartiles$FemaleLowerQuartile, paired=TRUE)
+b <- t.test(Data_Quartiles$MaleLowerMiddleQuartile,Data_Quartiles$FemaleLowerMiddleQuartile, paired=TRUE)
+c <- t.test(Data_Quartiles$MaleUpperMiddleQuartile, Data_Quartiles$FemaleUpperMiddleQuartile, paired=TRUE)
+d <- t.test(Data_Quartiles$MaleTopQuartile, Data_Quartiles$FemaleTopQuartile, paired=TRUE)
+a
+b
+c
+d
+
+#They are all signficantly different from one another
+
+```
+
+```
