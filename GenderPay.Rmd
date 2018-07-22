@@ -28,7 +28,7 @@ library(ppcor)
 library("reshape2")
 
 #Setting working directory
-setwd("~/Documents/Rfiles/DataIncubator")
+setwd("~/Documents/Rfiles/DataIncubator/Project")
 
 #Reading in the data
 RawData<- read.csv(file="UK Gender Pay Gap Data.csv")
@@ -144,7 +144,7 @@ graph_Nooutilers <- ggplot(data=Size_HourlyDiff_NO_OUTLIERS, aes(x=EmployerSize,
   theme_grey() +
   theme(axis.text = element_text(size = 10,angle = 90), axis.title = element_text(size = 12), legend.position="right", legend.text = element_text(size = 10),legend.key.size = unit(1,"cm"), plot.title = element_text(size=12, hjust = 0.5)) +
   ggtitle("Plot of Gender Pay Gap by Employer Size") +
-labs(x="Employer Size",y="Difference in Hourly Pay (Fem - Male)")
+labs(x="Employer Size",y="Difference in Hourly Pay (Male - Fem)")
 graph_Nooutilers
 
 ggsave(filename = "Plot of Gender Pay Gap by Employer Size.pdf")
